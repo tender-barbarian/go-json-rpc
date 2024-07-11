@@ -13,7 +13,7 @@ func main() {
 		return
 	}
 
-	err = s.Handler.Register("HealthCheck", &api.Health{})
+	err = s.Handler.Register("Health", &api.Health{})
 	if err != nil {
 		log.Fatalf("registering methods: %v", err)
 		return
