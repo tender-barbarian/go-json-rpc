@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
+	"strings"
 )
 
 const (
@@ -40,8 +41,8 @@ type Handler struct {
 }
 
 type service struct {
-	name   string
-	method reflect.Value
+	name    string
+	methods map[string]reflect.Value
 }
 
 func (h *Handler) Register(name string, method interface{}) error {
@@ -53,15 +54,20 @@ func (h *Handler) Register(name string, method interface{}) error {
 		return fmt.Errorf("method cannot be nil!")
 	}
 
-	m := reflect.ValueOf(method)
-
-	if !m.MethodByName(name).IsValid() {
-		return fmt.Errorf("method cannot be anonymous!")
+	// get methods from service
+	var methods = make(map[string]reflect.Value)
+	t := reflect.TypeOf(method)
+	for i := 0; i < t.NumMethod(); i++ {
+		val := reflect.ValueOf(method).MethodByName(t.Method(i).Name)
+		if !val.IsValid() {
+			return fmt.Errorf("methods cannot be anonymous!")
+		}
+		methods[t.Method(i).Name] = val
 	}
 
 	h.Services[name] = service{
-		name:   name,
-		method: m,
+		name:    name,
+		methods: methods,
 	}
 
 	return nil
@@ -82,26 +88,45 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	service, ok := h.Services[req.Method]
-	if ok {
-		method := service.method.MethodByName(service.name)
-		if method.Type().NumIn() != len(req.Params) {
-			rpcErr, _ := json.Marshal(&Error{Code: InvalidParams, Message: "Invalid method parameter(s).", Data: fmt.Sprintf("Too many parameters. Method takes %d params, %d provided", method.Type().NumIn(), len(req.Params))})
-			fmt.Fprint(w, string(rpcErr))
-			return
-		}
-
-		inputs := make([]reflect.Value, len(req.Params))
-		for i := range req.Params {
-			inputs[i] = reflect.ValueOf(req.Params[i])
-		}
-
-		ret := method.Call(inputs)
-
-		response, _ := json.Marshal(&Response{Jsonrpc: req.Jsonrpc, Result: ret[0].Interface().(string), Id: req.Id})
-		fmt.Fprint(w, string(response))
-	} else {
-		rpcErr, _ := json.Marshal(&Error{Code: MethodNotFound, Message: "The method does not exist / is not available.", Data: ""})
+	// find service
+	m := strings.Split(req.Method, ".")
+	if len(m) < 2 {
+		rpcErr, _ := json.Marshal(&Error{Code: MethodNotFound, Message: "The method does not exist / is not available.", Data: "Provided method name needs to have format service.method"})
 		fmt.Fprint(w, string(rpcErr))
+		return
 	}
+	serviceName := m[0]
+	methodName := m[1]
+	service, serviceFound := h.Services[serviceName]
+	if !serviceFound {
+		rpcErr, _ := json.Marshal(&Error{Code: MethodNotFound, Message: "The method does not exist / is not available.", Data: fmt.Sprintf("Provided service %s does not exist", serviceName)})
+		fmt.Fprint(w, string(rpcErr))
+		return
+	}
+
+	// find method
+	method, methodFound := service.methods[methodName]
+	if !methodFound {
+		rpcErr, _ := json.Marshal(&Error{Code: MethodNotFound, Message: "The method does not exist / is not available.", Data: fmt.Sprintf("Provided method %s does not exist", methodName)})
+		fmt.Fprint(w, string(rpcErr))
+		return
+	}
+
+	// make sure provided params are valid
+	if method.Type().NumIn() != len(req.Params) {
+		rpcErr, _ := json.Marshal(&Error{Code: InvalidParams, Message: "Invalid method parameter(s).", Data: fmt.Sprintf("Too many parameters. Method takes %d params, %d provided", method.Type().NumIn(), len(req.Params))})
+		fmt.Fprint(w, string(rpcErr))
+		return
+	}
+
+	// compile params into call input
+	inputs := make([]reflect.Value, len(req.Params))
+	for i := range req.Params {
+		inputs[i] = reflect.ValueOf(req.Params[i])
+	}
+	ret := method.Call(inputs)
+
+	response, _ := json.Marshal(&Response{Jsonrpc: req.Jsonrpc, Result: ret[0].Interface().(string), Id: req.Id})
+	fmt.Fprint(w, string(response))
+
 }

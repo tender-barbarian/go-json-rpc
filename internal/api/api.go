@@ -2,6 +2,6 @@ package api
 
 type Health struct{}
 
-func (h Health) HealthCheck() string {
+func (h Health) Check() string {
 	return "OK!"
 }
