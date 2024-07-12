@@ -11,19 +11,19 @@ import (
 
 type MockService struct{}
 
-func (m *MockService) MockMethodOne() string {
-	return "Hello from mock method one!"
+func (m MockService) MockMethodOne(args map[string]interface{}) (string, error) {
+	return "Hello from mock method one!", nil
 }
 
-func (m *MockService) MockMethodTwo(argOne string, argTwo string) string {
-	return fmt.Sprintf("Hello from mock method two: %s %s", argOne, argTwo)
+func (m *MockService) MockMethodTwo(argOne map[string]interface{}) string {
+	return fmt.Sprintf("Hello from mock method two: %s", argOne)
 }
 
 func TestHandler_ServeHTTP(t *testing.T) {
 	tests := []struct {
 		name       string
 		request    string
-		method     interface{}
+		method     func(map[string]interface{}) (string, error)
 		methodName string
 		response   string
 	}{
@@ -31,50 +31,22 @@ func TestHandler_ServeHTTP(t *testing.T) {
 			name:       "Test 1: Test Health Check method",
 			request:    "{\"jsonrpc\":\"2.0\",\"id\":100,\"method\":\"Health.Check\"}",
 			response:   "{\"jsonrpc\":\"2.0\",\"result\":\"OK!\",\"id\":100}",
-			method:     &api.Health{},
-			methodName: "Health",
+			method:     api.Health{}.Check,
+			methodName: "Health.Check",
 		},
 		{
-			name:       "Test 2: Wrong number of parameters",
-			request:    "{\"jsonrpc\":\"2.0\",\"id\":100,\"method\":\"Health.Check\", \"params\":[\"test\",\"test1\", \"test2\"]}",
-			response:   "{\"Code\":-32602,\"Message\":\"Invalid method parameter(s).\",\"Data\":\"Too many parameters. Method takes 0 params, 3 provided\"}",
-			method:     &api.Health{},
-			methodName: "Health",
+			name:       "Test 2: Invalid parameters",
+			request:    "{\"jsonrpc\":\"2.0\",\"id\":100,\"method\":\"Health.Check\", \"params\":[\"test\",\"test2\"]}",
+			response:   "{\"Code\":-32700,\"Message\":\"Invalid JSON was received by the server. An error occurred on the server while parsing the JSON text.\",\"Data\":\"json: cannot unmarshal array into Go struct field Request.params of type map[string]interface {}\"}",
+			method:     api.Health{}.Check,
+			methodName: "Health.Check",
 		},
 		{
-			name:       "Test 3: Wrong method format",
-			request:    "{\"jsonrpc\":\"2.0\",\"id\":100,\"method\":\"HealthCheck\", \"params\":[\"test\",\"test1\", \"test2\"]}",
-			response:   "{\"Code\":-32601,\"Message\":\"The method does not exist / is not available.\",\"Data\":\"Provided method name needs to have format service.method\"}",
-			method:     &MockService{},
-			methodName: "MockService",
-		},
-		{
-			name:       "Test 4: Service does not exist",
-			request:    "{\"jsonrpc\":\"2.0\",\"id\":100,\"method\":\"Test.Test\", \"params\":[\"test\",\"test1\", \"test2\"]}",
-			response:   "{\"Code\":-32601,\"Message\":\"The method does not exist / is not available.\",\"Data\":\"Provided service Test does not exist\"}",
-			method:     &MockService{},
-			methodName: "MockService",
-		},
-		{
-			name:       "Test 5: Method does not exist",
-			request:    "{\"jsonrpc\":\"2.0\",\"id\":100,\"method\":\"Health.Get\", \"params\":[\"test\",\"test1\", \"test2\"]}",
-			response:   "{\"Code\":-32601,\"Message\":\"The method does not exist / is not available.\",\"Data\":\"Provided method Get does not exist\"}",
-			method:     &api.Health{},
-			methodName: "Health",
-		},
-		{
-			name:       "Test 6: Test service with multiple methods",
-			request:    "{\"jsonrpc\":\"2.0\",\"id\":100,\"method\":\"MockService.MockMethodOne\"}",
-			response:   "{\"jsonrpc\":\"2.0\",\"result\":\"Hello from mock method one!\",\"id\":100}",
-			method:     &MockService{},
-			methodName: "MockService",
-		},
-		{
-			name:       "Test 7: Test service with multiple methods",
-			request:    "{\"jsonrpc\":\"2.0\",\"id\":100,\"method\":\"MockService.MockMethodTwo\",\"params\":[\"test\",\"test1\"]}",
-			response:   "{\"jsonrpc\":\"2.0\",\"result\":\"Hello from mock method two: test test1\",\"id\":100}",
-			method:     &MockService{},
-			methodName: "MockService",
+			name:       "Test 3: Method does not exist",
+			request:    "{\"jsonrpc\":\"2.0\",\"id\":100,\"method\":\"Health.Get\", \"params\":{\"test\":\"test1\", \"test2\":\"test2\"}}",
+			response:   "{\"Code\":-32601,\"Message\":\"The method does not exist / is not available.\",\"Data\":\"\"}",
+			method:     api.Health{}.Check,
+			methodName: "Health.Check",
 		},
 	}
 	for _, tt := range tests {
@@ -109,24 +81,18 @@ func TestHandler_ServeHTTP(t *testing.T) {
 func TestHandler_Register(t *testing.T) {
 	tests := []struct {
 		name       string
-		method     interface{}
+		method     func(map[string]interface{}) (string, error)
 		methodName string
 		wantErr    bool
 	}{
 		{
 			name:       "Test 1",
-			method:     &api.Health{},
+			method:     api.Health{}.Check,
 			methodName: "HealthCheck",
 			wantErr:    false,
 		},
 		{
-			name:       "Test 2: Anonymous function",
-			method:     func() {},
-			methodName: "Anon",
-			wantErr:    true,
-		},
-		{
-			name:       "Test 3: Nil function",
+			name:       "Test 2: Nil function",
 			method:     nil,
 			methodName: "",
 			wantErr:    true,
