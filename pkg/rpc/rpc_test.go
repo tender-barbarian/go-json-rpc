@@ -3,20 +3,26 @@ package rpc
 import (
 	"bytes"
 	"fmt"
-	"go-json-rpc/internal/api"
+	"go-json-rpc/examples/api"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 )
 
-type MockService struct{}
+type testService struct{}
 
-func (m MockService) MockMethodOne(args map[string]interface{}) (string, error) {
+func (m *testService) Hello(args map[string]interface{}) (string, error) {
 	return "Hello from mock method one!", nil
 }
 
-func (m *MockService) MockMethodTwo(argOne map[string]interface{}) string {
-	return fmt.Sprintf("Hello from mock method two: %s", argOne)
+func (m *testService) HelloParams(args map[string]interface{}) (string, error) {
+	var k string
+	var v string
+	for key, value := range args {
+		k = key
+		v = value.(string)
+	}
+	return fmt.Sprintf("Hello from test method two! Key: %s, value: %s", k, v), nil
 }
 
 func TestHandler_ServeHTTP(t *testing.T) {
@@ -28,25 +34,32 @@ func TestHandler_ServeHTTP(t *testing.T) {
 		response   string
 	}{
 		{
-			name:       "Test 1: Test Health Check method",
-			request:    "{\"jsonrpc\":\"2.0\",\"id\":100,\"method\":\"Health.Check\"}",
-			response:   "{\"jsonrpc\":\"2.0\",\"result\":\"OK!\",\"id\":100}",
-			method:     api.Health{}.Check,
-			methodName: "Health.Check",
+			name:       "Test 1: Test RPC",
+			request:    "{\"jsonrpc\":\"2.0\",\"id\":100,\"method\":\"MockService.Hello\"}",
+			response:   "{\"jsonrpc\":\"2.0\",\"result\":\"Hello from mock method one!\",\"id\":100}",
+			method:     (&testService{}).Hello,
+			methodName: "MockService.Hello",
 		},
 		{
-			name:       "Test 2: Invalid parameters",
-			request:    "{\"jsonrpc\":\"2.0\",\"id\":100,\"method\":\"Health.Check\", \"params\":[\"test\",\"test2\"]}",
+			name:       "Test 2: Test RPC - method with params",
+			request:    "{\"jsonrpc\":\"2.0\",\"id\":100,\"method\":\"MockService.HelloParams\", \"params\":{\"test\":\"test2\"}}",
+			response:   "{\"jsonrpc\":\"2.0\",\"result\":\"Hello from test method two! Key: test, value: test2\",\"id\":100}",
+			method:     (&testService{}).HelloParams,
+			methodName: "MockService.HelloParams",
+		},
+		{
+			name:       "Test 3: Invalid parameters",
+			request:    "{\"jsonrpc\":\"2.0\",\"id\":100,\"method\":\"MockService.Hello\", \"params\":[\"test\",\"test2\"]}",
 			response:   "{\"Code\":-32700,\"Message\":\"Invalid JSON was received by the server. An error occurred on the server while parsing the JSON text.\",\"Data\":\"json: cannot unmarshal array into Go struct field Request.params of type map[string]interface {}\"}",
-			method:     api.Health{}.Check,
-			methodName: "Health.Check",
+			method:     (&testService{}).Hello,
+			methodName: "MockService.Hello",
 		},
 		{
-			name:       "Test 3: Method does not exist",
+			name:       "Test 4: Method does not exist",
 			request:    "{\"jsonrpc\":\"2.0\",\"id\":100,\"method\":\"Health.Get\", \"params\":{\"test\":\"test1\", \"test2\":\"test2\"}}",
 			response:   "{\"Code\":-32601,\"Message\":\"The method does not exist / is not available.\",\"Data\":\"\"}",
-			method:     api.Health{}.Check,
-			methodName: "Health.Check",
+			method:     (&testService{}).Hello,
+			methodName: "MockService.Hello",
 		},
 	}
 	for _, tt := range tests {

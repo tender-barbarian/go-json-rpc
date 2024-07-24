@@ -15,11 +15,6 @@ const (
 	ServerError    = -32000
 )
 
-type Method interface {
-	~*struct{}
-	func() (string, error)
-}
-
 type Error struct {
 	Code    int
 	Message string
