@@ -7,19 +7,19 @@ import (
 )
 
 func main() {
-	s, err := server.New(":8080")
+	server, err := server.New(":8080")
 	if err != nil {
 		log.Fatalf("initializing RPC server: %v", err)
 		return
 	}
 
-	err = s.Handler.Register("Health", &api.Health{})
+	err = server.Handler.Register("Health.Check", api.Health{}.Check)
 	if err != nil {
 		log.Fatalf("registering methods: %v", err)
 		return
 	}
 
-	err = s.Start()
+	err = server.Start()
 	if err != nil {
 		log.Fatalf("starting RPC server: %v", err)
 		return
