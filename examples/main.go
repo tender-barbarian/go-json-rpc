@@ -1,13 +1,13 @@
 package main
 
 import (
-	"go-json-rpc/examples/api"
-	"go-json-rpc/pkg/rpc"
 	"log"
+
+	"github.com/tender-barbarian/go-json-rpc/examples/api"
 )
 
 func main() {
-	server, err := rpc.New(":8080")
+	server, err := New(":8080")
 	if err != nil {
 		log.Fatalf("initializing RPC server: %v", err)
 		return
