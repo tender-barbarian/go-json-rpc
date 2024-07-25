@@ -3,7 +3,6 @@ package rpc
 import (
 	"bytes"
 	"fmt"
-	"go-json-rpc/examples/api"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -12,7 +11,7 @@ import (
 type testService struct{}
 
 func (m *testService) Hello(args map[string]interface{}) (string, error) {
-	return "Hello from mock method one!", nil
+	return "Hello from Test method one!", nil
 }
 
 func (m *testService) HelloParams(args map[string]interface{}) (string, error) {
@@ -35,31 +34,31 @@ func TestHandler_ServeHTTP(t *testing.T) {
 	}{
 		{
 			name:       "Test 1: Test RPC",
-			request:    "{\"jsonrpc\":\"2.0\",\"id\":100,\"method\":\"MockService.Hello\"}",
-			response:   "{\"jsonrpc\":\"2.0\",\"result\":\"Hello from mock method one!\",\"id\":100}",
+			request:    "{\"jsonrpc\":\"2.0\",\"id\":100,\"method\":\"TestService.Hello\"}",
+			response:   "{\"jsonrpc\":\"2.0\",\"result\":\"Hello from Test method one!\",\"id\":100}",
 			method:     (&testService{}).Hello,
-			methodName: "MockService.Hello",
+			methodName: "TestService.Hello",
 		},
 		{
 			name:       "Test 2: Test RPC - method with params",
-			request:    "{\"jsonrpc\":\"2.0\",\"id\":100,\"method\":\"MockService.HelloParams\", \"params\":{\"test\":\"test2\"}}",
+			request:    "{\"jsonrpc\":\"2.0\",\"id\":100,\"method\":\"TestService.HelloParams\", \"params\":{\"test\":\"test2\"}}",
 			response:   "{\"jsonrpc\":\"2.0\",\"result\":\"Hello from test method two! Key: test, value: test2\",\"id\":100}",
 			method:     (&testService{}).HelloParams,
-			methodName: "MockService.HelloParams",
+			methodName: "TestService.HelloParams",
 		},
 		{
 			name:       "Test 3: Invalid parameters",
-			request:    "{\"jsonrpc\":\"2.0\",\"id\":100,\"method\":\"MockService.Hello\", \"params\":[\"test\",\"test2\"]}",
-			response:   "{\"Code\":-32700,\"Message\":\"Invalid JSON was received by the server. An error occurred on the server while parsing the JSON text.\",\"Data\":\"json: cannot unmarshal array into Go struct field Request.params of type map[string]interface {}\"}",
+			request:    "{\"jsonrpc\":\"2.0\",\"id\":100,\"method\":\"TestService.Hello\", \"params\":[\"test\",\"test2\"]}",
+			response:   "{\"Code\":-32700,\"Message\":\"Invalid JSON was received by the server. An error occurred on the server while parsing the JSON text.\",\"Data\":\"json: cannot unmarshal array into Go struct field request.params of type map[string]interface {}\"}",
 			method:     (&testService{}).Hello,
-			methodName: "MockService.Hello",
+			methodName: "TestService.Hello",
 		},
 		{
 			name:       "Test 4: Method does not exist",
 			request:    "{\"jsonrpc\":\"2.0\",\"id\":100,\"method\":\"Health.Get\", \"params\":{\"test\":\"test1\", \"test2\":\"test2\"}}",
 			response:   "{\"Code\":-32601,\"Message\":\"The method does not exist / is not available.\",\"Data\":\"\"}",
 			method:     (&testService{}).Hello,
-			methodName: "MockService.Hello",
+			methodName: "TestService.Hello",
 		},
 	}
 	for _, tt := range tests {
@@ -100,8 +99,8 @@ func TestHandler_Register(t *testing.T) {
 	}{
 		{
 			name:       "Test 1",
-			method:     api.Health{}.Check,
-			methodName: "HealthCheck",
+			method:     (&testService{}).Hello,
+			methodName: "TestService.Hello",
 			wantErr:    false,
 		},
 		{

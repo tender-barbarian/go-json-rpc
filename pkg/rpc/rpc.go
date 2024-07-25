@@ -6,29 +6,14 @@ import (
 	"net/http"
 )
 
-const (
-	ParseError     = -32700
-	InvalidRequest = -32600
-	MethodNotFound = -32601
-	InvalidParams  = -32602
-	InternalError  = -32603
-	ServerError    = -32000
-)
-
-type Error struct {
-	Code    int
-	Message string
-	Data    string
-}
-
-type Request struct {
+type request struct {
 	Jsonrpc string                 `json:"jsonrpc"`
 	Method  string                 `json:"method"`
 	Params  map[string]interface{} `json:"params,omitempty"`
 	Id      int                    `json:"id"`
 }
 
-type Response struct {
+type response struct {
 	Jsonrpc string `json:"jsonrpc"`
 	Result  string `json:"result"`
 	Id      int    `json:"id"`
@@ -52,25 +37,22 @@ func (h *Handler) Register(name string, method func(map[string]interface{}) (str
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	var req Request
+	var req request
 	if r.Body == nil {
-		rpcErr, _ := json.Marshal(&Error{Code: InvalidRequest, Message: "The JSON sent is not a valid Request object.", Data: "Empty object received"})
-		fmt.Fprint(w, string(rpcErr))
+		rpcError(w, invalidRequest, fmt.Errorf("Request body cannot be nil"))
 		return
 	}
 
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
-		rpcErr, _ := json.Marshal(&Error{Code: ParseError, Message: "Invalid JSON was received by the server. An error occurred on the server while parsing the JSON text.", Data: err.Error()})
-		fmt.Fprint(w, string(rpcErr))
+		rpcError(w, parseError, err)
 		return
 	}
 
 	// find registered method
 	method, methodFound := h.Methods[req.Method]
 	if !methodFound {
-		rpcErr, _ := json.Marshal(&Error{Code: MethodNotFound, Message: "The method does not exist / is not available.", Data: ""})
-		fmt.Fprint(w, string(rpcErr))
+		rpcError(w, methodNotFound, nil)
 		return
 	}
 
@@ -78,12 +60,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	m := *method
 	res, err := m(req.Params)
 	if err != nil {
-		rpcErr, _ := json.Marshal(&Error{Code: ServerError, Message: "Method returned error.", Data: err.Error()})
-		fmt.Fprint(w, string(rpcErr))
+		rpcError(w, methodError, err)
 		return
 	}
 
-	response, _ := json.Marshal(&Response{Jsonrpc: req.Jsonrpc, Result: res, Id: req.Id})
+	response, _ := json.Marshal(&response{Jsonrpc: req.Jsonrpc, Result: res, Id: req.Id})
 	fmt.Fprint(w, string(response))
-
 }

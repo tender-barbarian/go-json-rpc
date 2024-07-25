@@ -1,16 +1,18 @@
-package rpc
+package main
 
 import (
 	"net/http"
+
+	"github.com/tender-barbarian/go-json-rpc/pkg/rpc"
 )
 
 type Server struct {
 	URL     string
-	Handler *Handler
+	Handler *rpc.Handler
 }
 
 func New(URL string) (*Server, error) {
-	return &Server{URL: URL, Handler: &Handler{}}, nil
+	return &Server{URL: URL, Handler: &rpc.Handler{}}, nil
 }
 
 func (s *Server) Start() error {
